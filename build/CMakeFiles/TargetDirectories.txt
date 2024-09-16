@@ -1,0 +1,3 @@
+/Users/joeypeterson/Desktop/sinewave_cpp/build/CMakeFiles/sinewave_cpp.dir
+/Users/joeypeterson/Desktop/sinewave_cpp/build/CMakeFiles/edit_cache.dir
+/Users/joeypeterson/Desktop/sinewave_cpp/build/CMakeFiles/rebuild_cache.dir
