@@ -41,7 +41,7 @@ void writeToFile(ofstream &file, int value, int size) {
 
 void generateWaveFile(int N, std::vector<float> &data) {
     ofstream audioFile;
-    audioFile.open("Amin7withkisshipass0.wav", ios::binary);
+    audioFile.open("Amin7HiPass", ios::binary);
     //Header chunk
     audioFile << "RIFF";
     audioFile << "----";
@@ -83,10 +83,10 @@ void generateWaveFile(int N, std::vector<float> &data) {
 }
 
 int main(int argc, char **argv) {
-    string chord = argv[1]; //7th chord desired
-    int duration = std::stoi(argv[2]); //duration(seconds)
-    int hiPassFrequencyCutoff = std::stoi(argv[3]);
-    int N = sampleRate * duration;
+    // string chord = argv[1]; //7th chord desired
+    int duration = std::stoi(argv[1]); //audio length(seconds)
+    int hiPassFrequencyCutoff = std::stoi(argv[2]);
+    int N = sampleRate * duration; //number of samples
 
     SineOscillator sineOscillatorA(a4NoteHz, 0.125);
     SineOscillator sineOscillatorC(c4NoteHz, 0.125);
@@ -103,15 +103,14 @@ int main(int argc, char **argv) {
     // perform FFT with kissfft library 
     kiss_fftr_cfg forward_cfg = kiss_fftr_alloc(N, 0, NULL, NULL);
     std::vector<kiss_fft_cpx> outFreq(N / 2 + 1);
-    std::fill(outFreq.begin(), outFreq.end(), kiss_fft_cpx{0.0, 0.0});
+    std::fill(outFreq.begin(), outFreq.end(), kiss_fft_cpx{0.0, 0.0}); //watching for any plan/cache
 
     kiss_fftr(forward_cfg, samples.data(), outFreq.data());
 
-    // process HIGH pass filter at cutoff frequency = 500 Hz
+    // process HIGH pass filter
     std::vector<kiss_fft_cpx> hpSamples(N / 2 + 1);
-    int cutoffFrequency = 0;
-    int frequencyCutOffBinK = cutoffFrequency * sampleRate / (N / 2 + 1);
-    std::cout << "frequencycutoffbink: " << frequencyCutOffBinK << std::endl;
+    int frequencyCutOffBinK = hiPassFrequencyCutoff * sampleRate / (N / 2 + 1);
+    std::cout << "frequency cutoff bin: " << frequencyCutOffBinK << std::endl;
     for (int k = frequencyCutOffBinK; k >= 0; --k) {
         outFreq[k].r = 0.0;
         outFreq[k].i = 0.0;
@@ -120,7 +119,7 @@ int main(int argc, char **argv) {
     // convert data back to time domain
     kiss_fftr_cfg inverse_cfg = kiss_fftr_alloc(N / 2, 1, NULL, NULL);
     std::vector<float> outTime(N);
-    std::fill(outTime.begin(), outTime.end(), float(0.0));
+    std::fill(outTime.begin(), outTime.end(), float(0.0)); //watching for any plan/cache
     kiss_fftri(inverse_cfg, outFreq.data(), outTime.data());
 
     free(inverse_cfg);
