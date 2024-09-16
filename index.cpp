@@ -39,9 +39,10 @@ void writeToFile(ofstream &file, int value, int size) {
     file.write(reinterpret_cast<const char*> (&value), size);
 }
 
-void generateWaveFile(int N, std::vector<float> &data) {
+void generateWaveFile(int N, std::vector<float> &data, string fileSuffix) {
     ofstream audioFile;
-    audioFile.open("Amin7HiPass", ios::binary);
+    string fileName = "Amin7" + fileSuffix + ".wav";
+    audioFile.open(fileName, ios::binary);
     //Header chunk
     audioFile << "RIFF";
     audioFile << "----";
@@ -129,7 +130,7 @@ int main(int argc, char **argv) {
         outTime[i] = outTime[i] / float(N); //normalize data
     }
 
-    generateWaveFile(N, outTime);
+    generateWaveFile(N, outTime, argv[2]);
 
     return 0;
 }
