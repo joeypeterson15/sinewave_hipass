@@ -1,5 +1,6 @@
 #include <iostream>
 #include "kiss_fftr.h"
+#include "AudioFile.h"
 #include <cmath>
 #include <fstream>
 #include <array>
@@ -102,81 +103,114 @@ void generateWaveFile(int N, std::vector<float> &data, string fileSuffix) {
     audioFile.close();
 }
 
-int waveFileReader() {
-    std::ifstream file("/Users/joeypeterson/Desktop/test_impulse_response.wav", std::ios::binary);
+// int waveFileReader() {
+//     std::ifstream file("/Users/joeypeterson/Desktop/test_impulse_response.wav", std::ios::binary);
 
-    if (!file.is_open()) {
-        std::cerr << "Error opening file!" << std::endl;
-        return 1;
-    }
+//     if (!file.is_open()) {
+//         std::cerr << "Error opening file!" << std::endl;
+//         return 1;
+//     }
 
-    WAVHeader header;
-    file.read(reinterpret_cast<char*>(&header), sizeof(header));  // Read the header
+//     WAVHeader header;
+//     file.read(reinterpret_cast<char*>(&header), sizeof(header));  // Read the header
 
-    // Output header information in a readable format
-    std::cout << "ChunkID: " << std::string(header.chunkID, 4) << std::endl;
-    std::cout << "ChunkSize: " << header.chunkSize << std::endl;
-    std::cout << "Format: " << std::string(header.format, 4) << std::endl;
-    std::cout << "Subchunk1ID: " << std::string(header.subchunk1ID, 4) << std::endl;
-    std::cout << "AudioFormat: " << header.audioFormat << std::endl;
-    std::cout << "NumChannels: " << header.numChannels << std::endl;
-    std::cout << "SampleRate: " << header.sampleRate << std::endl;
-    std::cout << "BitsPerSample: " << header.bitsPerSample << std::endl;
-    std::cout << "Subchunk2Size: " << header.subchunk2Size << std::endl;
+//     // Output header information in a readable format
+//     std::cout << "ChunkID: " << std::string(header.chunkID, 4) << std::endl;
+//     std::cout << "ChunkSize: " << header.chunkSize << std::endl;
+//     std::cout << "Format: " << std::string(header.format, 4) << std::endl;
+//     std::cout << "Subchunk1ID: " << std::string(header.subchunk1ID, 4) << std::endl;
+//     std::cout << "AudioFormat: " << header.audioFormat << std::endl;
+//     std::cout << "NumChannels: " << header.numChannels << std::endl;
+//     std::cout << "SampleRate: " << header.sampleRate << std::endl;
+//     std::cout << "BitsPerSample: " << header.bitsPerSample << std::endl;
+//     std::cout << "Subchunk2Size: " << header.subchunk2Size << std::endl;
 
-    // Optionally, read audio data (not human-readable) into a buffer
-    std::vector<char> audioData(header.subchunk2Size);
-    file.read(audioData.data(), header.subchunk2Size);
+//     // Optionally, read audio data (not human-readable) into a buffer
+//     std::vector<char> audioData(header.subchunk2Size);
+//     file.read(audioData.data(), header.subchunk2Size);
 
-    file.close();
-    return 0;
-}
+//     file.close();
+//     return 0;
+// }
 
 int main(int argc, char **argv) {
-    // read impulse response test file
-    waveFileReader();
-
-    // string chord = argv[1]; //7th chord desired
-    int duration = std::stoi(argv[1]); //audio length(seconds)
-    int hiPassFrequencyCutoff = std::stoi(argv[2]);
+    int hiPassFrequencyCutoff = 900;
+    int duration = 2;
+    if (argc > 1) {
+        duration = std::stoi(argv[1]); //audio length(seconds)
+    }
+    if (argc > 2) {
+        hiPassFrequencyCutoff = std::stoi(argv[2]);
+    }
     int N = sampleRate * duration; //number of samples
 
+
+    // Read test impulse response with AudioFile
+    AudioFile<float> audioFile;
+    audioFile.load ("/Users/joeypeterson/Desktop/test_impulse_response.wav");
+    audioFile.printSummary();
+
+    // collect samples from impulse response(its stereo so just take the first channel's samples)
+    std::vector <float> impulseResponseSamples(N);
+    int channel = 0;
+    int numImpulseSamples = audioFile.getNumSamplesPerChannel();
+    for (int i = 0; i < numImpulseSamples; i++) {
+        impulseResponseSamples[i] = audioFile.samples[channel][i];
+    }
+    // Since the impulse response is not the full 2 seconds, add zeros for the rest 
+    for (int i = numImpulseSamples; i < N; i++) {
+        impulseResponseSamples[i] = 0.0f;
+    }
+
+    // Create Amin7 chord
     SineOscillator sineOscillatorA(a4NoteHz, 0.125);
     SineOscillator sineOscillatorC(c4NoteHz, 0.125);
     SineOscillator sineOscillatorE(e5NoteHz, 0.125);
     SineOscillator sineOscillatorG(g5NoteHz, 0.125);
 
     // collect sound data
-    std::vector <float> samples(N, 0.0f);
+    std::vector <float> sineWaveSamples(N, 0.0f);
     for (int i = 0; i < N; ++i) {
         float sample = sineOscillatorA.process() + sineOscillatorC.process() + sineOscillatorE.process() + sineOscillatorG.process();
-        samples[i] = sample;
+        sineWaveSamples[i] = sample;
     }
 
-    // perform FFT with kissfft library 
-    kiss_fftr_cfg forward_cfg = kiss_fftr_alloc(N, 0, NULL, NULL);
-    std::vector<kiss_fft_cpx> outFreq(N / 2 + 1);
-    std::fill(outFreq.begin(), outFreq.end(), kiss_fft_cpx{0.0, 0.0}); //watching for any plan/cache
+    // perform FFT on impulse response
+    kiss_fftr_cfg forward_impulse_cfg = kiss_fftr_alloc(N, 0, NULL, NULL);
+    std::vector<kiss_fft_cpx> outImpulseFreq(N / 2 + 1);
+    kiss_fftr(forward_impulse_cfg, impulseResponseSamples.data(), outImpulseFreq.data());
 
-    kiss_fftr(forward_cfg, samples.data(), outFreq.data());
+    // perform FFT on Amin7
+    kiss_fftr_cfg forward_Amin7_cfg = kiss_fftr_alloc(N, 0, NULL, NULL);
+    std::vector<kiss_fft_cpx> outAmin7Freq(N / 2 + 1);
+    std::fill(outAmin7Freq.begin(), outAmin7Freq.end(), kiss_fft_cpx{0.0, 0.0}); //watching for any plan/cache
+    kiss_fftr(forward_Amin7_cfg, sineWaveSamples.data(), outAmin7Freq.data());
 
-    // process HIGH pass filter
-    std::vector<kiss_fft_cpx> hpSamples(N / 2 + 1);
+    // perform Convolution on Amin7 and Impulse Response(with frequency domain you can just multiply at same index)
+    std::vector<kiss_fft_cpx> processedSamples(N / 2 + 1);
+    for (int i = 0; i < N / 2 + 1; i++) {
+        processedSamples[i].r = outAmin7Freq[i].r * outImpulseFreq[i].r;
+        processedSamples[i].i = outAmin7Freq[i].i * outImpulseFreq[i].i;
+    }
+
+
+    // HIGH pass filter(optional)
     int frequencyCutOffBinK = hiPassFrequencyCutoff * sampleRate / (N / 2 + 1);
     std::cout << "frequency cutoff bin: " << frequencyCutOffBinK << std::endl;
     for (int k = frequencyCutOffBinK; k >= 0; --k) {
-        outFreq[k].r = 0.0;
-        outFreq[k].i = 0.0;
+        processedSamples[k].r = 0.0;
+        processedSamples[k].i = 0.0;
     }
 
     // convert data back to time domain
     kiss_fftr_cfg inverse_cfg = kiss_fftr_alloc(N / 2, 1, NULL, NULL);
     std::vector<float> outTime(N);
     std::fill(outTime.begin(), outTime.end(), float(0.0)); //watching for any plan/cache
-    kiss_fftri(inverse_cfg, outFreq.data(), outTime.data());
+    kiss_fftri(inverse_cfg, processedSamples.data(), outTime.data());
 
+    free(forward_impulse_cfg);
+    free(forward_Amin7_cfg); // Free the Kiss FFT configuration
     free(inverse_cfg);
-    free(forward_cfg); // Free the Kiss FFT configuration
 
     for (int i = 0; i < N; i++) {
         outTime[i] = outTime[i] / float(N); //normalize data

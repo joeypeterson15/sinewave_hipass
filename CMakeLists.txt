@@ -2,9 +2,10 @@ cmake_minimum_required(VERSION 3.10)
 project(ProcessAudio)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 include_directories(${PROJECT_NAME} "/Users/joeypeterson/Desktop/kissfft-master")
+include_directories(${PROJECT_NAME} "/Users/joeypeterson/Desktop/AudioFile")
 link_directories(/Users/joeypeterson/Desktop/kissfft-master/build)
 
 # Add your executable
